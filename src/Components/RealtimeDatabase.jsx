@@ -1,15 +1,17 @@
 import { useEffect, useState } from "react";
-import {
-  collection,
-  doc,
-  getDocs,
-  setDoc,
-  updateDoc,
-  deleteDoc,
-} from "firebase/firestore";
 import { v4 as uuidv4 } from "uuid";
-import { db } from "../helpers/firebaseConfig";
+import { database } from "../helpers/firebaseConfig";
 import TableContent from "./TableContent";
+import {
+  child,
+  get,
+  onValue,
+  ref,
+  remove,
+  set,
+  update,
+} from "firebase/database";
+import axios from "axios";
 
 function RealtimeDatabase() {
   const allCollections = ["anotherDetails", "usersInfo"];
@@ -20,44 +22,163 @@ function RealtimeDatabase() {
   const [gender, setGender] = useState("");
   const [tableCaption, setTableCaption] = useState("");
   const [loading, setLoading] = useState(false);
+  function convertToArray(dataObject) {
+    const dataArray = Object.keys(dataObject).map((key) => ({
+      ...dataObject[key],
+    }));
+    return dataArray;
+  }
 
-  const getAllDocuments = async (collectionName) => {
+  const getAllDocuments = async () => {
     setLoading(true);
-    const collectionRef = collection(db, collectionName);
-    const getAllDocs = await getDocs(collectionRef);
-    const allDocuments = getAllDocs.docs.map((doc) => doc.data());
-    SetAllUsers(allDocuments);
-    setTableCaption(collectionName);
+    //' ---------------------------------- First  way {onValue}
+    // const dataRef = ref(database, "users");
+    // onValue(dataRef, (snapshot) => {
+    //   const data = snapshot.val();
+    //   console.log("Data: ", data);
+    // });
+    //' ---------------------------------- Second  way {get}
+    const dataRef = ref(database);
+    get(child(dataRef, `users`))
+      .then((snapshot) => {
+        if (snapshot.exists()) {
+          // console.log("snapshot.val() ->", snapshot.val());
+          // console.log(
+          //   "snapshot.val() Array ->",
+          //   convertToArray(snapshot.val())
+          // );
+
+          SetAllUsers(convertToArray(snapshot.val()));
+        } else {
+          console.log("No data available");
+          SetAllUsers([]);
+        }
+      })
+      .catch((error) => {
+        console.error(error);
+      });
+
+    //' ---------------------------------- By Axios
+    // try {
+    //   const response = await axios.get(
+    //     "https://testfirebase-fc8e4-default-rtdb.firebaseio.com/users.json"
+    //   );
+
+    //   if (response.data) {
+    //     // Convert the object to an array if needed
+    //     const dataObject = response.data;
+    //     console.log("convertToArray ->", convertToArray(dataObject));
+    //     SetAllUsers(convertToArray(dataObject)); // Set your state with the array
+    //   } else {
+    //     console.log("No data available");
+    //   }
+    // } catch (error) {
+    //   console.error("Error fetching data: ", error);
+    // }
     setLoading(false);
   };
 
-  const handleSubmit = async (collectionName) => {
+  const handleSubmit = async () => {
     setLoading(true);
-    const userId = uuidv4();
-    await setDoc(doc(db, collectionName, userId), {
-      id: userId,
-      username: username,
-      gender: gender,
-    });
-    getAllDocuments(collectionName);
+    // '-----------------------------By set
+    // const userId = uuidv4();
+    // set(ref(database, "users/" + userId), {
+    //   id: userId,
+    //   username: username,
+    //   gender: gender,
+    // });
+
+    // getAllDocuments();
+    // '-----------------------------By axios
+    try {
+      const userId = uuidv4();
+      // Construct the URL for posting data to Firebase
+      const url = `https://testfirebase-fc8e4-default-rtdb.firebaseio.com/users/${userId}.json`;
+
+      // Use Axios to send a POST request with the user data
+      await axios.put(url, {
+        id: userId,
+        username: username,
+        gender: gender,
+      });
+
+      console.log("Data added successfully!");
+
+      // Fetch the updated list of documents
+      getAllDocuments();
+    } catch (error) {
+      console.error("Error adding data: ", error);
+    }
     setLoading(false);
   };
 
-  const updateUser = async (collectionName, userId) => {
+  const updateUser = async (userId) => {
     setLoading(true);
-    const userDocRef = doc(db, collectionName, userId);
-    await updateDoc(userDocRef, {
-      id: userId,
-      username: username,
-      gender: gender,
-    });
-    getAllDocuments(collectionName);
+    // '---------------------------------- Frist way By Update
+    // const dataRef = ref(database, `users/${userId}`);
+    // update(dataRef, {
+    //   username: username,
+    //   gender: gender,
+    // })
+    //   .then(() => {
+    //     console.log("Data updated successfully!");
+    //   })
+    //   .catch((error) => {
+    //     console.error("Error updating data: ", error);
+    //   });
+    // getAllDocuments();
+
+    //' -----------------------------By axios
+    try {
+      // Replace the URL with your Firebase Realtime Database URL
+      const url = `https://testfirebase-fc8e4-default-rtdb.firebaseio.com/users/${userId}.json`;
+
+      // Make a PATCH request to update the data
+      const response = await axios.patch(url, {
+        username: username,
+        gender: gender,
+        otheInfo: "magnon",
+      });
+
+      console.log("Data updated successfully!", response.data);
+
+      // Optionally, you can fetch the updated documents
+      getAllDocuments();
+    } catch (error) {
+      console.error("Error updating data: ", error);
+    }
     setLoading(false);
   };
-  const deleteUser = async (collectionName, userId) => {
+
+  const deleteUser = async (userId) => {
     setLoading(true);
-    await deleteDoc(doc(db, collectionName, userId));
-    getAllDocuments(collectionName);
+    //' -------------------------First way by Remove
+    // const dataRef = ref(database, `users/${userId}`);
+    // remove(dataRef)
+    //   .then(() => {
+    //     console.log("Data deleted successfully!");
+    //   })
+    //   .catch((error) => {
+    //     console.error("Error deleting data: ", error);
+    //   });
+
+    // getAllDocuments();
+
+    //' ----------------------------second By Axios
+    try {
+      // Construct the URL to the specific user you want to delete
+      const url = `https://testfirebase-fc8e4-default-rtdb.firebaseio.com/users/${userId}.json`;
+
+      // Make the DELETE request using Axios
+      await axios.delete(url);
+
+      console.log("Data deleted successfully!");
+
+      // Fetch the updated list of documents
+      getAllDocuments();
+    } catch (error) {
+      console.error("Error deleting data: ", error);
+    }
     setLoading(false);
   };
 
@@ -70,7 +191,7 @@ function RealtimeDatabase() {
   };
 
   useEffect(() => {
-    getAllDocuments(allCollections[0]);
+    getAllDocuments();
   }, []);
 
   return (
@@ -144,28 +265,28 @@ function RealtimeDatabase() {
           }}>
           <button
             onClick={() => {
-              handleSubmit(collectionName);
+              handleSubmit();
             }}
             className="button">
             Submit
           </button>
           <button
             onClick={() => {
-              updateUser(collectionName, userId);
+              updateUser(userId);
             }}
             className="button">
             Update
           </button>
           <button
             onClick={() => {
-              deleteUser(collectionName, userId);
+              deleteUser(userId);
             }}
             className="button">
             Delete
           </button>
           <button
             onClick={() => {
-              getAllDocuments(collectionName);
+              getAllDocuments();
             }}
             className="button">
             Display All

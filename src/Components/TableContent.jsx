@@ -41,6 +41,19 @@ function TableContent({ tableCaption, loading, allUsers, setAllToForm }) {
                 />
               </div>
             )}
+            {!loading && allUsers.length === 0 && (
+              <tr>
+                <td
+                  colSpan="3"
+                  style={{
+                    textAlign: "center",
+                    fontSize: "18px",
+                    paddingBlock: "15px",
+                  }}>
+                  No data available
+                </td>
+              </tr>
+            )}
             {allUsers.map((user) => (
               <tr key={user.userID} onClick={() => setAllToForm(user)}>
                 <td>{user.id}</td>
